@@ -5,7 +5,7 @@ from copy import deepcopy
 
 #### parse the command line arguments
 
-parser = argparse.ArgumentParser(description='Convert Gaussian output to CASINO input')
+parser = argparse.ArgumentParser(description='Convert Gaussian09 output to CASINO input')
 parser.add_argument('-fchk', default='gaussian.fchk',help='Input formatted Gaussian checkpoint file')
 parser.add_argument('-gout', default='gaussian.out', help='File containing the stdout from a Gaussian run')
 parser.add_argument('-gwfn', default='gwfn.data',help='name for the gwfn.data file, if different')
