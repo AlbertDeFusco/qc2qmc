@@ -687,7 +687,7 @@ gwfn.write('------------------------\n')
 for i in range(len(alphaMOs)):
 	string = alphaMOs[i]
 	gwfn.write(string.rjust(20))
-	if ((i % 4 == 3):
+	if (i % 4 == 3):
 		gwfn.write('\n')
 if (unrestricted == 0):
 	gwfn.write('\n\n\n\n')
