@@ -228,7 +228,7 @@ def CISparse(gwfn, output,cutoff,maxdets):
 	sumCoeff = 0
 	while ((sumCoeff <= cutoff) and (detcount < maxdets) and (len(totalExcitations) > 0)):
 		entry = totalExcitations.pop(0)
-		sumCoeff += numpy.float(entry[2]) ** 2.
+		sumCoeff += numpy.float(entry[3]) ** 2.
 		detcount += 1			
 		writeDet.append('DET ' + str(detcount) + ' 1 PR ' + str(entry[0]) +' 1 ' + str(entry[1] + ' 1\n'))
 		writeCoeff.append(entry[2])
@@ -687,7 +687,7 @@ gwfn.write('------------------------\n')
 for i in range(len(alphaMOs)):
 	string = alphaMOs[i]
 	gwfn.write(string.rjust(20))
-	if (i % 4 == 0):
+	if ((i % 4 == 3):
 		gwfn.write('\n')
 if (unrestricted == 0):
 	gwfn.write('\n\n\n\n')
@@ -695,7 +695,7 @@ else:
 	for i in range(len(betaMOs)):
 		string = betaMOs[i]
 		gwfn.write(string.rjust(20))
-		if (i % 4 == 0):
+		if (i % 4 == 3):
 			gwfn.write('\n')
 gwfn.write('\n\n\n\n\n')
 gwfn.close()	
