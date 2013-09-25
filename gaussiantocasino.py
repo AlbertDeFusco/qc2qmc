@@ -1,38 +1,35 @@
-#!/opt/sam/python/2.7/gcc45/bin/python
+#!/usr/bin/env python
 
-import numpy
-import os
-import sys
+import numpy, os, sys, argparse
 from copy import deepcopy
+
+#### parse the command line arguments
+
+parser = argparse.ArgumentParser(description='Convert Gaussian output to CASINO input')
+parser.add_argument('-fchk', default='gaussian.fchk',help='Input formatted Gaussian checkpoint file')
+parser.add_argument('-gout', default='gaussian.out', help='File containing the stdout from a Gaussian run')
+parser.add_argument('-gwfn', default='gwfn.data',help='name for the gwfn.data file, if different')
+parser.add_argument('-corr', default='correlation.data',help='name for the correlation.data file, if different' )
+parser.add_argument('-cut', default=1.0,type=float,help='Sum of squares of coefficients for truncating CIS/CASSCF expansion')
+parser.add_argument('-maxdets',default = 99999,type=int,help='Maximum number of determinants to include')
+parser.add_argument('-state',default = 1, type=int,help='Which CIS excited state to use') 
+args = parser.parse_args()
 
 ## OPEN all of the relevant files ##
 
 try:
-	gaussianfchk = sys.argv[1]
+	fchk = open(vars(args)['fchk'],'r')
 except:
-	print "\n"
-	print "USAGE: ./gaussiantocasino.py [Gaussian Formatted Checkpoint File] [Gaussian Output File] \n"
-	print "\n"
-	quit()
-try:
-	gaussianoutput = sys.argv[2]
-except:
-        print "\n"
-        print "USAGE: ./gaussiantocasino.py [Gaussian Formatted Checkpoint File] [Gaussian Output File]	\n"
-        print "\n"
-	quit()
-try:
-	fchk = open(gaussianfchk,'r')
-except:
-	print "File " + gaussianfchk + " does not exist!\n"
+	print "File " + vars(args)['fchk'] + " does not exist!\n"
 	quit()
 
 try:
-	output = open(gaussianoutput,'r')
+	output = open(vars(args)['gout'],'r')
 except:
-	print "File " + gaussianoutput + " does not exist!\n"
+	print "File " + vars(args)['gout'] + " does not exist!\n"
 	quit()
-gwfn = open('gwfn.data','w')
+
+gwfn = open(vars(args)['gwfn'],'w')
 
 ## define useful functions
 
@@ -45,7 +42,6 @@ def normCoeff(coeff, expt, angmom):
 		normed = numpy.float(coeff) * ((2. * numpy.float(expt) / numpy.pi) ** (3./4.)) * 2. * numpy.float(expt)
 	elif (angmom == 5):
 		normed = numpy.float(coeff) * ((2. * numpy.float(expt) / numpy.pi) ** (3./4.)) * ((4 * numpy.float(expt)) ** 1.5) / numpy.sqrt(8.)
-#		normed = numpy.float(coeff) * ((2. * numpy.float(expt) / numpy.pi) ** (3./4.)) * ((4 * numpy.float(expt)) ** 1.5) / numpy.sqrt(15.)
 	return normed
 	
 def nnrepulsion(coordsinRows, atomnumbers):
@@ -135,7 +131,128 @@ def CAS09(gout):
 	numcore = line.split('=')[2].strip()
 	core = numpy.int(numcore)
 	return (orbitals, electrons, core, configs)	
+	
+def writeCAS09(gwfn,output,cutoff,maxdets):
+	detsout = []
+	energies = []
+	detcount = 0
+        (orbitals, electrons, core, configs) = CAS09(output)
+	line = ''
+	while (line != 'EIGENVALUE'):
+		newline = output.readline()
+		try:
+			line = newline.split(')')[1].split()[0].strip()
+		except:	
+			pass
+	newline = output.readline()
+	eiglist = []
+	indexlist = []
+	while (line != 'Final'):
+		line = newline.replace('(',')').split(')')
+		line.pop(0)				
+		line.pop(len(line) - 1)
+		while (len(line) > 1):
+			index = line.pop(0)
+			index = numpy.int(index)
+			indexlist.append(index)
+			eigenvalue = line.pop(0)
+			eiglist.append(eigenvalue)
+		newline = output.readline()
+		line = newline.split()[0].strip()
+	for i in range(len(indexlist)):
+		if (indexlist[i] == 1):
+			groundindex = i
+			break
+		else:
+			print i, indexlist[i]
+	sumForCutoff = 0.
+	for i in range(len(indexlist)):
+		if ((numpy.float(eiglist[i]) != 0.) and (sumForCutoff <= cutoff) and (detcount < maxdets)):
+			detcount += 1
+			parseCAS09(configs[indexlist[i] - 1], core, configs[groundindex], detcount, detsout)
+			energies.append(eiglist[i])	
+			sumForCutoff += numpy.float(eiglist[i]) ** 2.
+	output.close()
+	gwfn.write('MD\n')
+	gwfn.write(str(detcount) + '\n')
+	f = open(vars(args)['corr'],'a')
+	f.write('START MDET\n')
+	f.write('Title\n')
+	f.write('MDET Example\n')
+	f.write('Multideterminant/excitation specification (see manual)\n')
+	f.write('MD\n')
+	f.write(str(detcount) +'\n')
+	counter = 1
+	for item in energies:
+		gwfn.write(item + '\n')
+		if (counter == 1):
+			f.write(item + ' 1 0\n')
+			counter += 1
+		else:
+			f.write(item + ' ' + str(counter) + ' 1 \n')
+			counter += 1
+	for item in detsout:
+		gwfn.write(item)
+		f.write(item)
+	f.write('END MDET \n')
+	f.close()
 
+def CISparse(gwfn, output,cutoff,maxdets):
+	detone = []
+	dettwo = []
+	coeffs = []
+	state = str(vars(args)['state'])
+	line = ' '
+	targetline = ' Excited State   ' + state
+	while (line != targetline):
+		newline = output.readline()
+		line = newline.split(':')[0]
+	while ((line != 'SavETr:') and (line != 'This')):
+		newline = output.readline()
+		if (line == ''):
+			newline = 'This'
+		line = newline.split()[0].strip()
+		if ((line != 'SavETr:') and (line != 'This')):
+			line = newline.split('->')
+			detone.append(line[0].strip())
+			dettwo.append(line[1].split()[0].strip())
+			coeffs.append(line[1].split()[1].strip())
+	abslist = []
+	for entry in coeffs:
+		abslist.append(numpy.abs(numpy.float(entry)))
+	a = numpy.vstack((detone, dettwo,coeffs,abslist)).T
+	totalExcitations = sorted(a, key=lambda a_entry: a_entry[3], reverse=True)
+	writeDet = []
+	writeCoeff = []
+	detcount = 0
+	sumCoeff = 0
+	while ((sumCoeff <= cutoff) and (detcount < maxdets) and (len(totalExcitations) > 0)):
+		entry = totalExcitations.pop(0)
+		sumCoeff += numpy.float(entry[2]) ** 2.
+		detcount += 1			
+		writeDet.append('DET ' + str(detcount) + ' 1 PR ' + str(entry[0]) +' 1 ' + str(entry[1] + ' 1\n'))
+		writeCoeff.append(entry[2])
+	print "Squared sum of coefficients is " + str(sumCoeff) + '\n'
+	gwfn.write('MD\n')
+	gwfn.write(str(detcount) + '\n')
+	f = open(vars(args)['corr'],'a')
+	f.write('START MDET\n')
+	f.write('Title\n')
+	f.write('MDET Example\n')
+	f.write('Multideterminant/excitation specification (see manual)\n')
+	f.write('MD\n')
+	f.write(str(detcount) +'\n')
+	for i in range(len(writeCoeff)):
+		gwfn.write(writeCoeff[i] + ' \n')
+		if (i == 0):
+			f.write(writeCoeff[i] + ' ' + str(i + 1) + ' 0\n')
+		else:
+			f.write(writeCoeff[i] + ' ' + str(i + 1) + ' 1\n')
+	for item in writeDet:
+		gwfn.write(item)
+		f.write(item)
+	f.close()
+	output.close()
 ## Read the Gaussian output to get the basic information portion##
 
 line = ' '
@@ -313,10 +430,10 @@ while (line != "Alpha MO coefficients"):
 	line = newline.split('R')[0].strip()
 
 alphaMOs = []
-while ((line != "Total SCF Density") and (line != "Beta MO coefficients")):
+while ((line != "Total") and (line != "Beta")):
 	newline = fchk.readline()
-	line = newline.split('R')[0].strip()
-	if ((line != "Total SCF Density") and (line != "Beta MO coefficients")):
+	line = newline.split('R')[0].strip().split()[0].strip()
+	if ((line != "Total") and (line != "Beta")):
 		MOline = newline.split()
 		for MO in MOline:
 			alphaMOs.append(MO.strip())
@@ -357,22 +474,22 @@ while (MOcounter < len(alphaMOs)):
 			MOcounter += 4
 		elif (shell == 3):
 			MOcounter += 3
-		elif ((shell == 4) and (unrestricted == 0)):
-			alphaMOs[MOcounter] = '%.13E' % (numpy.float(alphaMOs[MOcounter]) /  numpy.sqrt(3))
-			alphaMOs[MOcounter + 1] = '%.13E' % (numpy.float(alphaMOs[MOcounter + 1]) * 2.)
-			alphaMOs[MOcounter + 2] = '%.13E' % (numpy.float(alphaMOs[MOcounter + 2]) * 2.)
-			alphaMOs[MOcounter + 4] = '%.13E' % (numpy.float(alphaMOs[MOcounter + 4]) * 2.)
-			MOcounter += 5
-		elif ((shell == 4) and (unrestricted == 1)): 
-			alphaMOs[MOcounter] = '%.13E' % (numpy.float(alphaMOs[MOcounter]) *  numpy.sqrt(3))
-			betaMOs[MOcounter] = '%.13E' % (numpy.float(betaMOs[MOcounter]) *  numpy.sqrt(3))
-			alphaMOs[MOcounter + 1] = '%.13E' % (numpy.float(alphaMOs[MOcounter + 1]) * 2.)
-			betaMOs[MOcounter + 1] = '%.13E' % (numpy.float(betaMOs[MOcounter + 1]) * 2.)
-			alphaMOs[MOcounter + 2] = '%.13E' % (numpy.float(alphaMOs[MOcounter + 2]) * 2.)
-			betaMOs[MOcounter + 2] = '%.13E' % (numpy.float(betaMOs[MOcounter + 2]) * 2.)
-			alphaMOs[MOcounter + 4] = '%.13E' % (numpy.float(alphaMOs[MOcounter + 4]) * 2.)
-			betaMOs[MOcounter + 4] = '%.13E' % (numpy.float(betaMOs[MOcounter + 4]) * 2.)
-        	        MOcounter += 5
+                elif ((shell == 4) and (unrestricted == 0)):
+                        alphaMOs[MOcounter] = '%.13E' % (numpy.float(alphaMOs[MOcounter]) / numpy.sqrt(3.))
+                        alphaMOs[MOcounter + 1] = '%.13E' % (numpy.float(alphaMOs[MOcounter + 1]) * 2.)
+                        alphaMOs[MOcounter + 2] = '%.13E' % (numpy.float(alphaMOs[MOcounter + 2]) * 2.)
+                        alphaMOs[MOcounter + 4] = '%.13E' % (numpy.float(alphaMOs[MOcounter + 4]) * 2.)
+                        MOcounter += 5
+                elif ((shell == 4) and (unrestricted == 1)):
+                        alphaMOs[MOcounter] = '%.13E' % (numpy.float(alphaMOs[MOcounter]) / numpy.sqrt(3.))
+                        betaMOs[MOcounter] = '%.13E' % (numpy.float(betaMOs[MOcounter]) / numpy.sqrt(3.))
+                        alphaMOs[MOcounter + 1] = '%.13E' % (numpy.float(alphaMOs[MOcounter + 1]) * 2.)
+                        betaMOs[MOcounter + 1] = '%.13E' % (numpy.float(betaMOs[MOcounter + 1]) * 2.)
+                        alphaMOs[MOcounter + 2] = '%.13E' % (numpy.float(alphaMOs[MOcounter + 2]) * 2.)
+                        betaMOs[MOcounter + 2] = '%.13E' % (numpy.float(betaMOs[MOcounter + 2]) * 2.)
+                        alphaMOs[MOcounter + 4] = '%.13E' % (numpy.float(alphaMOs[MOcounter + 4]) * 2.)
+                        betaMOs[MOcounter + 4] = '%.13E' % (numpy.float(betaMOs[MOcounter + 4]) * 2.)
+                        MOcounter += 5
                 elif ((shell == 5) and (unrestricted == 0)):
 			alphaMOs[MOcounter] = '%.13E' % (numpy.float(alphaMOs[MOcounter]) / numpy.sqrt(30) * 4.)
 			alphaMOs[MOcounter + 1] = '%.13E' % (numpy.float(alphaMOs[MOcounter+ 1]) / numpy.sqrt(5) * 2. /3.)
@@ -554,91 +671,31 @@ for row in positionofeachshell:
 gwfn.write(' \n')
 gwfn.write('MULTIDETERMINANT INFORMATION\n')
 gwfn.write('----------------------------\n')
+cutoff = numpy.float(vars(args)['cut'])
+maxdets = vars(args)['maxdets']
 if ((method == 'CASSCF') and (code == '09')):
-	detsout = []
-	energies = []
-	detcount = 0
-        (orbitals, electrons, core, configs) = CAS09(output)
-	line = ''
-	while (line != 'EIGENVALUE'):
-		newline = output.readline()
-		try:
-			line = newline.split(')')[1].split()[0].strip()
-		except:	
-			pass
-	newline = output.readline()
-	eiglist = []
-	indexlist = []
-	while (line != 'Final'):
-		line = newline.replace('(',')').split(')')
-		line.pop(0)				
-		line.pop(len(line) - 1)
-		while (len(line) > 1):
-			index = line.pop(0)
-			index = numpy.int(index)
-			indexlist.append(index)
-			eigenvalue = line.pop(0)
-			eiglist.append(eigenvalue)
-		newline = output.readline()
-		line = newline.split()[0].strip()
-	for i in range(len(indexlist)):
-		if (indexlist[i] == 1):
-			groundindex = i
-			break
-		else:
-			print i, indexlist[i]
-	for i in range(len(indexlist)):
-		if (numpy.float(eiglist[i]) != 0.):
-			detcount += 1
-			parseCAS09(configs[indexlist[i] - 1], core, configs[groundindex], detcount, detsout)
-			energies.append(eiglist[i])	
+	writeCAS09(gwfn,output,cutoff,maxdets)
+elif (method == 'RCIS-FC'):
+	CISparse(gwfn, output,cutoff,maxdets)
 	output.close()
-	gwfn.write('MD\n')
-	gwfn.write(str(detcount) + '\n')
-	f = open('correlation.data','a')
-	f.write('START MDET\n')
-	f.write('Title\n')
-	f.write('MDET Example\n')
-	f.write('Multideterminant/excitation specification (see manual)\n')
-	f.write('MD\n')
-	f.write(str(detcount) +'\n')
-	counter = 1
-	for item in energies:
-		gwfn.write(item + '\n')
-		if (counter == 1):
-			f.write(item + ' 1 0\n')
-			counter += 1
-		else:
-			f.write(item + ' ' + str(counter) + ' 1 \n')
-			counter += 1
-	for item in detsout:
-		gwfn.write(item)
-		f.write(item)
-	f.write('END MDET \n')
-	f.close()
 else:
 	gwfn.write('GS\n')
 	output.close()
 gwfn.write(' \n')
 gwfn.write('ORBITAL COEFFICIENTS\n')
 gwfn.write('------------------------\n')
-counter = 0
-while (len(alphaMOs) > 0):
-	string = alphaMOs.pop(0)
+for i in range(len(alphaMOs)):
+	string = alphaMOs[i]
 	gwfn.write(string.rjust(20))
-	counter += 1
-	if (counter == 4):
-		counter = 0
+	if (i % 4 == 0):
 		gwfn.write('\n')
 if (unrestricted == 0):
 	gwfn.write('\n\n\n\n')
 else:
-	while (len(betaMOs) > 0):
-		string = betaMOs.pop(0)
+	for i in range(len(betaMOs)):
+		string = betaMOs[i]
 		gwfn.write(string.rjust(20))
-		counter += 1
-		if (counter == 4):
-			counter = 0
+		if (i % 4 == 0):
 			gwfn.write('\n')
 gwfn.write('\n\n\n\n\n')
 gwfn.close()	
