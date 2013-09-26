@@ -251,6 +251,7 @@ def CISparse(gwfn, output,cutoff,maxdets):
 	for item in writeDet:
 		gwfn.write(item)
 		f.write(item)
+	f.write('END MDET \n')
 	f.close()
 	output.close()
 ## Read the Gaussian output to get the basic information portion##
