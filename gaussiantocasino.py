@@ -150,13 +150,12 @@ def writeCAS09(gwfn,output,cutoff,maxdets):
 	while (line != 'Final'):
 		line = newline.replace('(',')').split(')')
 		line.pop(0)				
-		line.pop(len(line) - 1)
 		while (len(line) > 1):
 			index = line.pop(0)
 			index = numpy.int(index)
 			indexlist.append(index)
 			eigenvalue = line.pop(0)
-			eiglist.append(eigenvalue)
+			eiglist.append(eigenvalue.strip())
 		newline = output.readline()
 		line = newline.split()[0].strip()
 	for i in range(len(indexlist)):
