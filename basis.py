@@ -1,7 +1,10 @@
 #!/usr/bin/env python
-import sys
 from math import pi,sqrt
 
+# The GAMESS primitive normalization
+#
+# found in inputa.src::ATOMS
+#
 def primNormGAMESS(prim):
   ang=prim[0]
   alpha=prim[1]
@@ -27,8 +30,11 @@ def primNormGAMESS(prim):
 
   return sqrt(norm)
 
-def conNorm(contraction,normFunction):
-  out=list()
+# The GAMESS contraction normalization
+#
+# In inputa.src::ATOMS, the primitives are normalized first
+#
+def conNormGAMESS(contraction,normFunction,primNorm=False):
   norm=0.
   for i in contraction:
     ang = i[0]
@@ -46,7 +52,7 @@ def conNorm(contraction,normFunction):
       # p primitive
       if(ang == 1):
 	prim = 0.5*ci*cj/(ee*fac)
-      
+
       # d primitive
       if(ang == 2):
 	prim = 0.75*ci*cj/(ee*ee*fac)
@@ -54,35 +60,56 @@ def conNorm(contraction,normFunction):
       # f primitive
       if(ang == 3):
 	prim = 1.875*ci*cj/(ee*ee*ee*fac)
-    
+
       norm = norm + prim
-      
+
   norm = sqrt(norm*pi**(3./2.))
 
+
+  return [(i[0],i[1],i[2]/norm/normFunction(i)) if primNorm
+      else (i[0],i[1],i[2]/norm)
+      for i in contraction]
+
+
+# CASINO/Crystal contraction normalization
+#
+# From Mike Towler in CASINO/examples/generic/gauss_dfg
+#
+def conNormCASINO(contraction): #,normFunction,primNorm=False)
+  norm=0.
   for i in contraction:
-    out.append((i[0],
-                i[1],
-                i[2] / norm))
+    ang = i[0]
+    ai = i[1]
+    di = i[2] #/ normFunction(i)
+    for j in contraction:
+      aj = j[1]
+      dj = j[2] #/ normFunction(j)
 
-  return out
+      norm = norm + \
+          di*dj * ( 2.*sqrt(aj*aj) / (ai + aj) )**(ang + 3./2.)
+
+  norm = sqrt(norm)
+
+  return [(i[0],i[1],i[2]/norm) for i in contraction]
+
+def primNormCASINO(prim):
+  ang=prim[0]
+  alpha=prim[1]
+  coeff=prim[2]
+
+  norm = sqrt(2.**(ang+3./2.)*alpha**(ang+3./2.)) / pi**(3./4.) \
+         * sqrt(2.**ang / dFac(2*ang-1))
+
+  return norm
 
 
-
+# The double factorial
 def dFac(n):
   try:
     return reduce(lambda x,y: y*x, range(n,1,-2))
   except:
     return 1
 
-def primNormBe(prim):
-  ang=prim[0]
-  alpha=prim[1]
-  coeff=prim[2]
-
-  piAlpha = (2.*alpha/pi)**(3./2.)
-
-  return sqrt(piAlpha * (4.*alpha)**(ang) / dFac(2.*ang-1))
-  
 
 def checkContraction(contraction):
   ang=contraction[0][0]
@@ -95,23 +122,16 @@ def checkContraction(contraction):
 
 
 #Provide the contraction as a list of tuples
-# [ (l, alpha, c ), etc. ]
-contraction = list()
-
-try:
-  contraction = sys.argv[1]
-except:
-  contraction = [ (2,46.1353741080831021977,0.06678829454430918743),
-                  (2,20.2682182253994397729,0.23122499388298942708),
-		  (2,6.09459166525985575420,5.07995919900226523237) ]
-
-checkContraction(contraction)
+# [ (l, alpha, d ), etc. ]
+contraction = [ (2,46.1353741080831021977,0.06678829454430918743),
+                (2,20.2682182253994397729,0.23122499388298942708),
+                (2,6.09459166525985575420,5.07995919900226523237) ]
 
 
 print "Angular Momentum %3d" % contraction[0][0]
 print "  Input Contraction"
 for prim in contraction:
-  print "    Exponent %15.8f; %15.8f" % \
+  print "    Exp %15.8f; Coeff %15.8f" % \
       (prim[1],prim[2])
 
 print
@@ -119,20 +139,32 @@ print
 print "  Normalized primitives"
 for prim in contraction:
   gmsFac = primNormGAMESS(prim)
-  BeFac  = primNormBe(prim)
+  qmcFac  = primNormCASINO(prim)
 
-  print "    Exponent %15.8f; GMS %15.8f; Be %15.8f" % \
-      (prim[1],prim[2]/gmsFac,prim[2]/BeFac)
+  print "    Exp %15.8f; GAMESS Coeff %15.8f; CASINO Coeff %15.8f" % \
+      (prim[1],prim[2]/gmsFac,prim[2]*qmcFac)
 
 print
 print
 print "  GAMESS Normalized contractions"
-for prim in conNorm(contraction,primNormGAMESS):
-  print "    Exponent %15.8f; %15.8f" % \
+for prim in conNormGAMESS(contraction,primNormGAMESS):
+  print "    Exp %15.8f; Coeff %15.8f" % \
       (prim[1],prim[2])
 print
 print
-print "  GAMESS Normalized contractions"
-for prim in conNorm(contraction,primNormBe):
-  print "    Exponent %15.8f; %15.8f" % \
+print "  GAMESS primitive-normalized contractions"
+for prim in conNormGAMESS(contraction,primNormGAMESS,True):
+  print "    Exp %15.8f; Coeff %15.8f" % \
       (prim[1],prim[2])
+print
+print
+print "  CASINO Normalized contractions"
+for prim in conNormCASINO(contraction):
+  print "    Exp %15.8f; Coeff %15.8f" % \
+      (prim[1],prim[2])
+print
+print
+print "  CASINO primitive-normalized contractions"
+for prim in conNormCASINO(contraction):
+  print "    Exp %15.8f; Coeff %15.8f" % \
+      (prim[1],prim[2]*primNormCASINO(prim))
