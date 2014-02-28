@@ -75,10 +75,10 @@ def conNormGAMESS(contraction,normFunction,primNorm=False):
 #
 # The next two functions come from
 #   Mike Towler in CASINO/examples/generic/gauss_dfg
-# NOTE: the normFunction=lambda x: x just means do nothing
+# NOTE: "normFunction=lambda x: x" just means do nothing
 #   if a normFunction is not given when conNormCASINO is called
 #
-def conNormCASINO(contraction,normFunction=lambda x: x,primNorm=False):
+def conNormCASINO(contraction,normFunction=(lambda x: x),primNorm=False):
   norm=0.
   for iprim in contraction:
     ang = iprim[0]
@@ -93,6 +93,7 @@ def conNormCASINO(contraction,normFunction=lambda x: x,primNorm=False):
 
   norm = sqrt(norm)
 
+  #when primNorm = True return the primitive-normalized contraction
   return [(prim[0],prim[1],prim[2]*normFunction(prim)/norm) if primNorm
       else (prim[0],prim[1],prim[2]/norm)
       for prim in contraction]
