@@ -10,29 +10,29 @@ def primNormGAMESS(prim):
   alpha=prim[1]
   coeff=prim[2]
 
-  facs =  pi**(3./2.) / ( 2.*alpha * sqrt(2.*alpha))
+  fac =  pi**(3./2.) / ( 2.*alpha * sqrt(2.*alpha))
 
   # s functions
   if(ang == 0):
-    norm = facs
+    norm = fac
 
   # p functions
   if(ang == 1):
-    norm = 0.5 * facs / (2.*alpha)
+    norm = 0.5 * fac / (2.*alpha)
 
   # d functions
   if(ang == 2):
-    norm = 0.75 * facs / (4.*alpha**2)
+    norm = 0.75 * fac / (4.*alpha**2)
 
   # f functions
   if(ang == 3):
-    norm = 1.875 * facs / (4.*alpha**3)
+    norm = 1.875 * fac / (8.*alpha**3)
 
   return sqrt(norm)
 
 # The GAMESS contraction normalization
 #
-# In inputa.src::ATOMS, the contraction coefficients are 
+# In inputa.src::ATOMS, the contraction coefficients are
 #  divided by the primitive normalization constant
 #
 def conNormGAMESS(contraction,normFunction,primNorm=False):
@@ -133,9 +133,13 @@ if __name__ == "__main__":
 
   #Provide the contraction as a list of tuples
   # [ (l, alpha, d ), etc. ]
-  contraction = [ (2,46.1353741080831021977,0.06678829454430918743),
-                  (2,20.2682182253994397729,0.23122499388298942708),
-                  (2,6.09459166525985575420,5.07995919900226523237) ]
+# contraction = [ (2,46.1353741080831021977,0.06678829454430918743),
+#                 (2,20.2682182253994397729,0.23122499388298942708),
+#                 (2,6.09459166525985575420,5.07995919900226523237) ]
+
+  contraction = [ (3,60.0434382795337167843,0.11407461847341315449),
+                  (3,22.1675054852210094114,0.10668188273112432880),
+                  (3,4.80239596988874257441,15.21685292468813489609) ]
 
 # The next step is to read the contractions from a file or as a commandline argument
 
