@@ -54,43 +54,83 @@ def nnrepulsion(coordsinRows, atomnumbers):
 	sum /= len(atomnumbers)
 	return sum
 
-def parseCAS09(config, core, ground, detno, writeout):
+def parseCAS09(config, core, ground, detno, writeout,signlist):
 	groundlist = list(ground)
 	configlist = list(config)
 	missingalpha = []
 	addedalpha = []
 	missingbeta = []
 	addedbeta = []
+	groundOrbUp = []
+	groundOrbDown = []
+	exOrbUp = []
+	exOrbDown = []
 	for i in range(len(configlist)):
 		if (groundlist[i] != configlist[i]):
 			if ((groundlist[i] == '0') and (configlist[i] == 'a')):
 				addedalpha.append(i) 
+				exOrbUp.append(i)
 			elif ((groundlist[i] == '0') and (configlist[i] == 'b')):
 				addedbeta.append(i)
+				exOrbDown.append(i)
 			elif ((groundlist[i] == '0') and (configlist[i] == '1')):
 				addedalpha.append(i)
 				addedbeta.append(i)
+				exOrbUp.append(i)
+				exOrbDown.append(i)
 			elif ((groundlist[i] == 'a') and (configlist[i] == '0')):
-                                missingalpha.append(i) 
+                                missingalpha.append(i)
+                                groundOrbUp.append(i)
                         elif ((groundlist[i] == 'a') and (configlist[i] == '1')):
                                 addedbeta.append(i)
+                                groundOrbUp.append(i)
+                                exOrbUp.append(i)
+                                exOrbDown.append(i)
 			elif ((groundlist[i] == 'a') and (configlist[i] == 'b')):
                                 addedbeta.append(i)
+                                groundOrbUp.append(i)
 				missingalpha.append(i)
+				exOrbDown.append(i)
 			elif ((groundlist[i] == 'b') and (configlist[i] == '0')):
                                 missingbeta.append(i)
+                                groundOrbDown.append(i)
                         elif ((groundlist[i] == 'b') and (configlist[i] == '1')):
                                 addedalpha.append(i)
+                                groundOrbDown.append(i)
+                                exOrbUp.append(i)
+                                exOrbDown.append(i)
                         elif ((groundlist[i] == 'b') and (configlist[i] == 'a')):
                                 addedalpha.append(i)
 				missingbeta.append(i)
+				groundOrbDown.append(i)
+				exOrbUp.append(i)
 			elif ((groundlist[i] == '1') and (configlist[i] == '0')):
                                 missingbeta.append(i)
 				missingalpha.append(i)
+				groundOrbUp.append(i)
+				groundOrbDown.append(i)
+				exOrbDown.append(i)
                         elif ((groundlist[i] == '1') and (configlist[i] == 'a')):
                                 missingbeta.append(i)
+                                groundOrbUp.append(i)
+                                groundOrbDown.append(i)
+                                exOrbUp.append(i)
 			elif ((groundlist[i] == '1') and (configlist[i] == 'b')):
                                 missingalpha.append(i)
+                                groundOrbUp.append(i)
+                                groundOrbDown.append(i)
+                                exOrbDown.append(i)
+			elif ((groundlist[1] == '1') and (configlist[i] == '1')):
+				groundOrbUp.append(i)
+				groundOrbDown.append(i)
+                                exOrbUp.append(i)
+                                exOrbDown.append(i)
+                      	elif ((groundlist[1] == 'a') and (configlist[i] == 'a')):
+				groundOrbUp.append(i)
+                                exOrbUp.append(i)
+			elif ((groundlist[1] == 'b') and (configlist[i] == 'b')):
+				groundOrbDown.append(i)
+                                exOrbDown.append(i)                           
 	for i in range(len(missingalpha)):
 		orbout = core + missingalpha[i] + 1
 		orbin = core + addedalpha[i] + 1 
@@ -99,6 +139,13 @@ def parseCAS09(config, core, ground, detno, writeout):
 		orbout = core +	missingbeta[i]	+ 1
                 orbin =	core + addedbeta[i] + 1 
                 writeout.append('DET ' + str(detno) + ' 2 PR ' + str(orbout) + ' 1 ' + str(orbin) + ' 1\n')  
+	for i in range(len(groundOrbUp):
+		for j in range(len(exOrbUp)):
+			if ((groundOrbUp(i) == exOrbUp(j)) and (i != j)):
+				orb = ExOrbUp.pop(j)
+				ExOrbUp.insert(i,orb)
+				signlist[len(signlist) - 1] *= -1
+		
 
 def CAS09(gout):
 	line = ' '
@@ -165,10 +212,12 @@ def writeCAS09(gwfn,output,cutoff,maxdets):
 		else:
 			print i, indexlist[i]
 	sumForCutoff = 0.
+	signList = []
 	for i in range(len(indexlist)):
 		if ((numpy.float(eiglist[i]) != 0.) and (sumForCutoff <= cutoff) and (detcount < maxdets)):
 			detcount += 1
-			parseCAS09(configs[indexlist[i] - 1], core, configs[groundindex], detcount, detsout)
+			signList.append(1)
+			parseCAS09(configs[indexlist[i] - 1], core, configs[groundindex], detcount, detsout,signList)
 			energies.append(eiglist[i])	
 			sumForCutoff += numpy.float(eiglist[i]) ** 2.
 	output.close()
@@ -182,7 +231,8 @@ def writeCAS09(gwfn,output,cutoff,maxdets):
 	f.write('MD\n')
 	f.write(str(detcount) +'\n')
 	counter = 1
-	for item in energies:
+	for i in range(len(energies)): #these aren't actually energies. they're coefficients. i am dumb.
+		item = energies[i] * signList[i]
 		gwfn.write(item + '\n')
 		if (counter == 1):
 			f.write(item + ' 1 0\n')
