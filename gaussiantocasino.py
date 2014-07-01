@@ -139,12 +139,18 @@ def parseCAS09(config, core, ground, detno, writeout,signlist):
 		orbout = core +	missingbeta[i]	+ 1
                 orbin =	core + addedbeta[i] + 1 
                 writeout.append('DET ' + str(detno) + ' 2 PR ' + str(orbout) + ' 1 ' + str(orbin) + ' 1\n')  
-	for i in range(len(groundOrbUp):
+	for i in range(len(groundOrbUp)):
 		for j in range(len(exOrbUp)):
-			if ((groundOrbUp(i) == exOrbUp(j)) and (i != j)):
-				orb = ExOrbUp.pop(j)
-				ExOrbUp.insert(i,orb)
-				signlist[len(signlist) - 1] *= -1
+			if ((groundOrbUp[i] == exOrbUp[j]) and (i != j)):
+				orb = exOrbUp.pop(j)
+				exOrbUp.insert(i,orb)
+				signlist[len(signlist) - 1] *= -1.
+	for i in range(len(groundOrbDown)):
+		for j in range(len(exOrbDown)):
+			if ((groundOrbDown[i] == exOrbDown[j]) and (i != j)):
+				orb = exOrbDown.pop(j)
+				exOrbDown.insert(i,orb)
+				signlist[len(signlist) - 1] *= -1.
 		
 
 def CAS09(gout):
@@ -219,7 +225,7 @@ def writeCAS09(gwfn,output,cutoff,maxdets):
 	for i in range(len(indexlist)):
 		if ((numpy.float(eiglist[i]) != 0.) and (sumForCutoff <= cutoff) and (detcount < maxdets)):
 			detcount += 1
-			signList.append(1)
+			signList.append(1.0)
 			parseCAS09(configs[indexlist[i] - 1], core, configs[groundindex], detcount, detsout,signList)
 			energies.append(eiglist[i])	
 			sumForCutoff += numpy.float(eiglist[i]) ** 2.
@@ -235,7 +241,7 @@ def writeCAS09(gwfn,output,cutoff,maxdets):
 	f.write(str(detcount) +'\n')
 	counter = 1
 	for i in range(len(energies)): #these aren't actually energies. they're coefficients. i am dumb.
-		item = energies[i] * signList[i]
+		item = str(numpy.float(energies[i]) * signList[i])
 		gwfn.write(item + '\n')
 		if (counter == 1):
 			f.write(item + ' 1 0\n')
