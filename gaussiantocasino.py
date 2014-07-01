@@ -157,13 +157,16 @@ def writeCAS09(gwfn,output,cutoff,maxdets):
 			eigenvalue = line.pop(0)
 			eiglist.append(eigenvalue.strip())
 		newline = output.readline()
-		line = newline.split()[0].strip()
+		try:
+			line = newline.split()[0].strip()
+		except:
+			line = 'Final'
 	for i in range(len(indexlist)):
 		if (indexlist[i] == 1):
 			groundindex = i
 			break
 		else:
-			print i, indexlist[i]
+			groundindex = 0
 	sumForCutoff = 0.
 	for i in range(len(indexlist)):
 		if ((numpy.float(eiglist[i]) != 0.) and (sumForCutoff <= cutoff) and (detcount < maxdets)):
@@ -272,7 +275,7 @@ while (line != "Number of electrons"):
 	line = newline.split('I')[0].strip()
 numberelectrons = newline.split('I')[1].strip()
 
-while (line != "Number of basis functions"):
+while (line != "Number of independent functions"):
 	newline = fchk.readline()
 	line = newline.split('I')[0].strip()
 numbasisfunctions = newline.split('I')[1].strip()
