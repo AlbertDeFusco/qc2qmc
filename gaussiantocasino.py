@@ -109,7 +109,6 @@ def parseCAS09(config, core, ground, detno, writeout,signlist):
 				missingalpha.append(i)
 				groundOrbUp.append(i)
 				groundOrbDown.append(i)
-				exOrbDown.append(i)
                         elif ((groundlist[i] == '1') and (configlist[i] == 'a')):
                                 missingbeta.append(i)
                                 groundOrbUp.append(i)
